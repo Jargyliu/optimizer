@@ -104,7 +104,7 @@ $batch = @($cat.tweaks | Where-Object { $skip -notcontains $_.id -and $_.presets
 $snaps = @{}; foreach ($t in $batch) { $snaps[$t.id] = Get-Snapshot $t }
 $null = Invoke-Engine 'tweaks.apply' @{ tweaks = $batch; ctx = $ctx }
 $state = Invoke-Engine 'state.get' @{}
-$tracked = @($state.tweaks.PSObject.Properties.Name)
+$tracked = @($state.tweaks.PSObject.Properties | ForEach-Object { $_.Name })
 if ($tracked.Count -lt $batch.Count) { Fail "state.json tracks $($tracked.Count) of $($batch.Count) tweaks" } else { Pass "state.json tracks $($tracked.Count) tweaks" }
 $rv = Invoke-Engine 'tweaks.revert' @{ tweaks = $batch; ctx = $ctx }
 foreach ($t in $batch) { $r = $rv.($t.id); if (-not $r.ok) { Fail "batch revert $($t.id): $($r.errors -join '; ')" } }
@@ -113,7 +113,7 @@ foreach ($t in $batch) {
     foreach ($k in $snaps[$t.id].Keys) { if ($k -ne 'power' -and $snaps[$t.id][$k] -ne $after[$k]) { Fail "batch $($t.id): '$k' not restored" } }
 }
 $state = Invoke-Engine 'state.get' @{}
-$left = @($state.tweaks.PSObject.Properties.Name)
+$left = @($state.tweaks.PSObject.Properties | ForEach-Object { $_.Name })
 if ($left.Count -ne 0) { Fail "state.json still tracks after reverting everything: $($left -join ', ')" } else { Pass 'batch revert left state.json clean' }
 
 Write-Host ''
