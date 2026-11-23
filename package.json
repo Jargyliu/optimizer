@@ -1,0 +1,100 @@
+{
+  "name": "tickrate",
+  "productName": "Tickrate",
+  "version": "0.1.0",
+  "description": "Low-latency Windows optimizer for Fortnite and Valorant, tuned for NVIDIA GPUs and AMD Ryzen X3D CPUs.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "dev:web": "vite",
+    "build:renderer": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test \"tests/*.test.cjs\"",
+    "docs": "node scripts/gen-docs.cjs",
+    "dist": "npm run build:renderer && electron-builder --win --publish never",
+    "dist:dir": "npm run build:renderer && electron-builder --win dir --publish never"
+  },
+  "build": {
+    "appId": "io.github.jargyliu.tickrate",
+    "productName": "Tickrate",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "engine",
+        "to": "engine"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "requireAdministrator",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Tickrate-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Tickrate-Portable-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Jargyliu",
+        "repo": "optimizer",
+        "releaseType": "draft"
+      }
+    ]
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "framer-motion": "^14.14.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "cross-env": "^10.1.0",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~5.9",
+    "vite": "^8.3.8",
+    "wait-on": "^9.5.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jargyliu/optimizer.git"
+  },
+  "author": "Jargyliu"
+}
