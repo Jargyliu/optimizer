@@ -106,13 +106,15 @@ $null = Invoke-Engine 'tweaks.apply' @{ tweaks = $batch; ctx = $ctx }
 $state = Invoke-Engine 'state.get' @{}
 $tracked = @($state.tweaks.PSObject.Properties.Name)
 if ($tracked.Count -lt $batch.Count) { Fail "state.json tracks $($tracked.Count) of $($batch.Count) tweaks" } else { Pass "state.json tracks $($tracked.Count) tweaks" }
-$null = Invoke-Engine 'tweaks.revert' @{ tweaks = $batch; ctx = $ctx }
+$rv = Invoke-Engine 'tweaks.revert' @{ tweaks = $batch; ctx = $ctx }
+foreach ($t in $batch) { $r = $rv.($t.id); if (-not $r.ok) { Fail "batch revert $($t.id): $($r.errors -join '; ')" } }
 foreach ($t in $batch) {
     $after = Get-Snapshot $t
     foreach ($k in $snaps[$t.id].Keys) { if ($k -ne 'power' -and $snaps[$t.id][$k] -ne $after[$k]) { Fail "batch $($t.id): '$k' not restored" } }
 }
 $state = Invoke-Engine 'state.get' @{}
-if (@($state.tweaks.PSObject.Properties.Name).Count -ne 0) { Fail 'state.json still tracks tweaks after reverting everything' } else { Pass 'batch revert left state.json clean' }
+$left = @($state.tweaks.PSObject.Properties.Name)
+if ($left.Count -ne 0) { Fail "state.json still tracks after reverting everything: $($left -join ', ')" } else { Pass 'batch revert left state.json clean' }
 
 Write-Host ''
 if ($script:failures.Count) {

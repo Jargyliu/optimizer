@@ -311,9 +311,20 @@ $ErrorActionPreference = 'Continue'
     guardMessage: 'Needs at least 16 GB of RAM.',
     ops: [
       ps({
-        apply: `$was = (Get-MMAgent).MemoryCompression; Disable-MMAgent -MemoryCompression | Out-Null; @{ wasEnabled = [bool]$was }`,
-        revert: `if ($null -eq $Backup -or $Backup.wasEnabled) { Enable-MMAgent -MemoryCompression | Out-Null }`,
-        detect: `-not (Get-MMAgent).MemoryCompression`,
+        apply: `# Memory compression is managed by SysMain; if SysMain is not running, compression is already inactive.
+$sysmain = Get-Service -Name SysMain -ErrorAction SilentlyContinue
+if (-not $sysmain -or $sysmain.Status -ne 'Running') { Write-TRLog '  SysMain is not running, so memory compression is already inactive'; return @{ wasEnabled = $false } }
+$was = (Get-MMAgent).MemoryCompression
+Disable-MMAgent -MemoryCompression | Out-Null
+@{ wasEnabled = [bool]$was }`,
+        revert: `if ($null -eq $Backup -or $Backup.wasEnabled) {
+  $sysmain = Get-Service -Name SysMain -ErrorAction SilentlyContinue
+  if ($sysmain -and $sysmain.Status -eq 'Running') { Enable-MMAgent -MemoryCompression | Out-Null }
+  else { Write-TRLog '  SysMain is not running; memory compression will turn back on when SysMain is re-enabled' }
+}`,
+        detect: `$sysmain = Get-Service -Name SysMain -ErrorAction SilentlyContinue
+if (-not $sysmain -or $sysmain.Status -ne 'Running') { return $true }
+-not (Get-MMAgent).MemoryCompression`,
       }),
     ],
   },
