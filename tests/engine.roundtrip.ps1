@@ -74,6 +74,7 @@ try {
 } catch { Fail "scan -> $($_.Exception.Message)" }
 
 Write-Host "`n== cleanup safety" -ForegroundColor Cyan
+Write-Host "  TEMP: $env:TEMP" 
 $ipc = Join-Path $env:TEMP 'tickrate'
 New-Item -ItemType Directory -Path $ipc -Force | Out-Null
 $protected = Join-Path $ipc 'keep-me.json'; Set-Content $protected 'x'; (Get-Item $protected).LastWriteTime = (Get-Date).AddDays(-3)
@@ -83,7 +84,7 @@ try {
     $r = Invoke-Engine 'cleanup.run' @{ ids = @('user-temp', 'windows-temp') }
     if (Test-Path $oldJunk) { Fail 'cleanup left an old temp file behind' } else { Pass 'old temp file removed' }
     if (Test-Path $fresh) { Pass 'temp file from the last 24h kept' } else { Fail 'cleanup deleted a fresh temp file' }
-    if (Test-Path $protected) { Pass "Tickrate's own temp folder untouched" } else { Fail "cleanup deleted Tickrate's own working files" }
+    if (Test-Path $protected) { Pass "Tickrate's own temp folder untouched" } else { Fail "cleanup deleted Tickrate's own working files (TEMP=$env:TEMP, long=$((Get-Item $env:TEMP).FullName))" }
 } catch { Fail "cleanup.run -> $($_.Exception.Message)" }
 Remove-Item $fresh, $protected -Force -ErrorAction SilentlyContinue
 

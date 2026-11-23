@@ -71,12 +71,35 @@ function Invoke-TRCleanupAnalyze {
     return $out
 }
 
+$script:LongPathTypeAdded = $false
+function Get-TRLongPath {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try {
+        if (-not $script:LongPathTypeAdded) {
+            Add-Type -Name TRPath -Namespace Tickrate -MemberDefinition '[DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern uint GetLongPathName(string s, System.Text.StringBuilder l, uint n);'
+            $script:LongPathTypeAdded = $true
+        }
+        $sb = New-Object Text.StringBuilder 1024
+        if ([Tickrate.TRPath]::GetLongPathName($Path, $sb, 1024) -gt 0) { return $sb.ToString() }
+    } catch { }
+    return $null
+}
+
 function Clear-TRDirectoryContents {
     param([string]$Path, [int]$KeepRecentDays = 0)
     $freed = 0L; $skipped = 0
     if (-not (Test-Path -LiteralPath $Path)) { return @{ freed = 0L; skipped = 0 } }
     # Never touch Tickrate's own working folders (older versions kept engine request files in %TEMP%\tickrate).
-    $protect = @((Join-Path $env:TEMP 'tickrate'), $script:DataRoot) | ForEach-Object { $_.TrimEnd('\') + '\' }
+    # Compare against both the path as given and its long form: %TEMP% is often an 8.3 short path
+    # (C:\Users\RUNNER~1\...) while enumerated files report long paths.
+    $protect = @()
+    foreach ($p in @((Join-Path $env:TEMP 'tickrate'), $script:DataRoot)) {
+        $protect += $p.TrimEnd('\') + '\'
+        if (Test-Path -LiteralPath $p) { $protect += (Get-Item -LiteralPath $p -Force).FullName.TrimEnd('\') + '\' }
+        $long = Get-TRLongPath $p
+        if ($long) { $protect += $long.TrimEnd('\') + '\' }
+    }
     $cutoff = (Get-Date).AddDays(-$KeepRecentDays)
     Get-ChildItem -LiteralPath $Path -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object {
         foreach ($pr in $protect) { if ($_.FullName.StartsWith($pr, [StringComparison]::OrdinalIgnoreCase)) { return } }
