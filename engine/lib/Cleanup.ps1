@@ -4,8 +4,9 @@ function Get-TRCleanupTargets {
     $la = $env:LOCALAPPDATA
     $win = $env:SystemRoot
     return @(
-        @{ id = 'user-temp'; paths = @($env:TEMP) },
-        @{ id = 'windows-temp'; paths = @("$win\Temp") },
+        # Temp files newer than a day can still be in use by a running installer or app (Windows Disk Cleanup uses a similar rule).
+        @{ id = 'user-temp'; paths = @($env:TEMP); keepRecentDays = 1 },
+        @{ id = 'windows-temp'; paths = @("$win\Temp"); keepRecentDays = 1 },
         @{ id = 'wu-cache'; paths = @("$win\SoftwareDistribution\Download"); services = @('wuauserv', 'bits') },
         @{ id = 'delivery-opt'; special = 'delivery-opt' },
         @{ id = 'nvidia-shader'; paths = @("$la\NVIDIA\DXCache", "$la\NVIDIA\GLCache", "$la\NVIDIA Corporation\NV_Cache", "$env:ProgramData\NVIDIA Corporation\NV_Cache") },
@@ -22,10 +23,14 @@ function Get-TRCleanupTargets {
 }
 
 function Get-TRDirStats {
-    param([string]$Path)
+    param([string]$Path, [int]$KeepRecentDays = 0)
     $size = 0L; $count = 0
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return @{ bytes = 0L; files = 0 } }
-    Get-ChildItem -LiteralPath $Path -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object { $size += $_.Length; $count++ }
+    $cutoff = (Get-Date).AddDays(-$KeepRecentDays)
+    Get-ChildItem -LiteralPath $Path -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($KeepRecentDays -gt 0 -and $_.LastWriteTime -gt $cutoff) { return }
+        $size += $_.Length; $count++
+    }
     return @{ bytes = $size; files = $count }
 }
 
@@ -53,7 +58,8 @@ function Measure-TRCleanupTarget {
         return Get-TRDirStats "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache"
     }
     $bytes = 0L; $files = 0
-    foreach ($p in (Get-TRTargetPaths $Target)) { $s = Get-TRDirStats $p; $bytes += $s.bytes; $files += $s.files }
+    $keep = 0; if ($Target.keepRecentDays) { $keep = [int]$Target.keepRecentDays }
+    foreach ($p in (Get-TRTargetPaths $Target)) { $s = Get-TRDirStats $p $keep; $bytes += $s.bytes; $files += $s.files }
     foreach ($f in @($Target.files)) { if ($f -and (Test-Path -LiteralPath $f)) { $bytes += (Get-Item -LiteralPath $f -Force).Length; $files++ } }
     if ($Target.glob) { Get-Item -Path $Target.glob -Force -ErrorAction SilentlyContinue | ForEach-Object { $bytes += $_.Length; $files++ } }
     return @{ bytes = $bytes; files = $files }
@@ -69,8 +75,11 @@ function Clear-TRDirectoryContents {
     param([string]$Path, [int]$KeepRecentDays = 0)
     $freed = 0L; $skipped = 0
     if (-not (Test-Path -LiteralPath $Path)) { return @{ freed = 0L; skipped = 0 } }
+    # Never touch Tickrate's own working folders (older versions kept engine request files in %TEMP%\tickrate).
+    $protect = @((Join-Path $env:TEMP 'tickrate'), $script:DataRoot) | ForEach-Object { $_.TrimEnd('\') + '\' }
     $cutoff = (Get-Date).AddDays(-$KeepRecentDays)
     Get-ChildItem -LiteralPath $Path -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object {
+        foreach ($pr in $protect) { if ($_.FullName.StartsWith($pr, [StringComparison]::OrdinalIgnoreCase)) { return } }
         if ($KeepRecentDays -gt 0 -and $_.LastWriteTime -gt $cutoff) { return }
         $len = $_.Length
         try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop; $freed += $len } catch { $skipped++ }
@@ -111,7 +120,7 @@ function Invoke-TRCleanupRun {
                     if ($f -and (Test-Path -LiteralPath $f)) { $len = (Get-Item -LiteralPath $f -Force).Length; try { Remove-Item -LiteralPath $f -Force -ErrorAction Stop; $freed += $len } catch { $skipped++ } }
                 }
                 if ($t.glob) { Get-Item -Path $t.glob -Force -ErrorAction SilentlyContinue | ForEach-Object { $len = $_.Length; try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop; $freed += $len } catch { $skipped++ } } }
-                foreach ($svc in $stopped) { Start-Service -Name $svc -ErrorAction SilentlyContinue }
+                foreach ($svc in $stopped) { Start-Service -Name $svc -ErrorAction SilentlyContinue -WarningAction SilentlyContinue }
             }
         } catch { Write-TRLog "  $($t.id) failed: $($_.Exception.Message)" }
         if ($freed -lt 0) { $freed = 0 }

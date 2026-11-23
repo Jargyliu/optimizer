@@ -73,6 +73,20 @@ try {
     if ($scan.software.backgroundApps -isnot [array]) { Fail 'scan.software.backgroundApps is not a JSON array' }
 } catch { Fail "scan -> $($_.Exception.Message)" }
 
+Write-Host "`n== cleanup safety" -ForegroundColor Cyan
+$ipc = Join-Path $env:TEMP 'tickrate'
+New-Item -ItemType Directory -Path $ipc -Force | Out-Null
+$protected = Join-Path $ipc 'keep-me.json'; Set-Content $protected 'x'; (Get-Item $protected).LastWriteTime = (Get-Date).AddDays(-3)
+$oldJunk = Join-Path $env:TEMP 'tr-old-junk.tmp'; Set-Content $oldJunk 'x'; (Get-Item $oldJunk).LastWriteTime = (Get-Date).AddDays(-3)
+$fresh = Join-Path $env:TEMP 'tr-fresh.tmp'; Set-Content $fresh 'x'
+try {
+    $r = Invoke-Engine 'cleanup.run' @{ ids = @('user-temp', 'windows-temp') }
+    if (Test-Path $oldJunk) { Fail 'cleanup left an old temp file behind' } else { Pass 'old temp file removed' }
+    if (Test-Path $fresh) { Pass 'temp file from the last 24h kept' } else { Fail 'cleanup deleted a fresh temp file' }
+    if (Test-Path $protected) { Pass "Tickrate's own temp folder untouched" } else { Fail "cleanup deleted Tickrate's own working files" }
+} catch { Fail "cleanup.run -> $($_.Exception.Message)" }
+Remove-Item $fresh, $protected -Force -ErrorAction SilentlyContinue
+
 Write-Host "`n== detect all tweaks" -ForegroundColor Cyan
 $ctx = @{ games = $games; cpuClass = 'other' }
 $initial = Invoke-Engine 'tweaks.detect' @{ tweaks = @($cat.tweaks); ctx = $ctx }

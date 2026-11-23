@@ -78,8 +78,8 @@ const protectedApps = [
 ];
 
 const cleanupTargets = [
-  { id: 'user-temp', label: 'Your temp files', detail: '%TEMP%: installers and apps leave files here and rarely clean up.', recommended: true },
-  { id: 'windows-temp', label: 'Windows temp files', detail: 'C:\\Windows\\Temp', recommended: true },
+  { id: 'user-temp', label: 'Your temp files', detail: '%TEMP%: installers and apps leave files here and rarely clean up. Files from the last 24 hours are kept because they may still be in use.', recommended: true },
+  { id: 'windows-temp', label: 'Windows temp files', detail: 'C:\\Windows\\Temp. Files from the last 24 hours are kept.', recommended: true },
   { id: 'wu-cache', label: 'Windows Update download cache', detail: 'Already-installed update packages. Windows re-downloads if needed.', recommended: true },
   { id: 'delivery-opt', label: 'Delivery Optimization cache', detail: 'Cached update chunks kept for peer-to-peer sharing.', recommended: true },
   { id: 'crash-dumps', label: 'Crash dumps', detail: 'Minidumps, MEMORY.DMP and live kernel reports. Keep them if you are diagnosing a BSOD.', recommended: true },

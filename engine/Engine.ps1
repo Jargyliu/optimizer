@@ -124,4 +124,6 @@ try {
     $result = @{ ok = $false; error = $msg; where = "$($_.InvocationInfo.ScriptName):$($_.InvocationInfo.ScriptLineNumber)" }
 }
 $json = $result | ConvertTo-Json -Depth 20 -Compress
+$dir = Split-Path $Response -Parent
+if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 [IO.File]::WriteAllText($Response, $json, (New-Object Text.UTF8Encoding $false))

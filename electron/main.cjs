@@ -39,7 +39,7 @@ function log(entry) {
   } catch { /* logging must never break the app */ }
 }
 
-const engine = new Engine({ engineDir, onLog: log });
+const engine = new Engine({ engineDir, ipcDir: path.join(dataRoot, 'ipc'), onLog: log });
 
 // ---------------- engine bridge ----------------
 const ALLOWED = new Set([

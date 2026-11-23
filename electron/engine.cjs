@@ -14,12 +14,12 @@ const MUTATING = new Set([
 ]);
 
 class Engine {
-  constructor({ engineDir, onLog }) {
+  constructor({ engineDir, ipcDir, onLog }) {
     this.engineDir = engineDir;
     this.onLog = onLog || (() => {});
     this.queue = Promise.resolve();
-    this.tmpDir = path.join(os.tmpdir(), 'tickrate');
-    fs.mkdirSync(this.tmpDir, { recursive: true });
+    // Request/response files live outside %TEMP% so the Cleanup page can never delete them mid-request.
+    this.tmpDir = ipcDir || path.join(os.tmpdir(), 'tickrate');
   }
 
   call(action, payload = {}) {
@@ -31,6 +31,7 @@ class Engine {
 
   #run(action, payload) {
     return new Promise((resolve, reject) => {
+      try { fs.mkdirSync(this.tmpDir, { recursive: true }); } catch (err) { return reject(new Error(`Cannot create ${this.tmpDir}: ${err.message}`)); }
       const id = crypto.randomUUID();
       const reqFile = path.join(this.tmpDir, `req-${id}.json`);
       const resFile = path.join(this.tmpDir, `res-${id}.json`);
