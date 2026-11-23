@@ -28,6 +28,7 @@ function Invoke-Engine([string]$Action, $Payload) {
     $tmp = Join-Path $env:TEMP ("tr-test-" + [guid]::NewGuid())
     $req = "$tmp-req.json"; $res = "$tmp-res.json"
     [IO.File]::WriteAllText($req, (@{ action = $Action; payload = $Payload } | ConvertTo-Json -Depth 30 -Compress), (New-Object Text.UTF8Encoding $false))
+    $ErrorActionPreference = 'Continue'
     $out = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $engine -Request $req -Response $res 2>&1
     $r = [IO.File]::ReadAllText($res) | ConvertFrom-Json
     Remove-Item $req, $res -Force -ErrorAction SilentlyContinue

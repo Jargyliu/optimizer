@@ -62,9 +62,17 @@ function New-TRScript {
     return [scriptblock]::Create("param(`$Ctx, `$Backup, `$Op)`n$Body")
 }
 
+# Runs bcdedit without letting stderr text become a terminating error.
+function Invoke-TRBcd {
+    param([string[]]$Arguments)
+    $ErrorActionPreference = 'Continue'
+    $out = & bcdedit.exe @Arguments 2>&1 | ForEach-Object { [string]$_ }
+    return @{ out = ($out -join "`n"); code = $LASTEXITCODE; lines = $out }
+}
+
 function Get-TRBcdValues {
     $map = @{}
-    $out = & bcdedit.exe /enum '{current}' 2>$null
+    $out = (Invoke-TRBcd @('/enum', '{current}')).lines
     foreach ($line in $out) {
         if ($line -match '^\s*([A-Za-z][A-Za-z0-9]+)\s+(.+?)\s*$') { $map[$Matches[1].ToLowerInvariant()] = $Matches[2] }
     }
@@ -119,8 +127,9 @@ function Get-TROpStatus {
             if (-not $Op.detect) { return 'na' }
             $r = & (New-TRScript $Op.detect) $Ctx $Backup $Op
             $r = @($r) | Select-Object -Last 1
-            if ($r -eq 'na') { return 'na' }
-            if ($r -eq $true) { return 'match' }
+            # compare strings explicitly: in PowerShell ($true -eq 'na') is $true
+            if (($r -is [string]) -and $r -eq 'na') { return 'na' }
+            if (($r -is [bool]) -and $r) { return 'match' }
             return 'nomatch'
         }
         default { throw "Unknown op type '$($Op.op)'" }
@@ -170,10 +179,12 @@ function Invoke-TROpApply {
                 $cur = $vals[$Op.key.ToLowerInvariant()]
                 $backup = @{ exists = ($null -ne $cur); value = $cur }
             }
-            if ($null -eq $Op.value) { $null = & bcdedit.exe /deletevalue '{current}' $Op.key 2>&1 }
-            else {
-                $out = & bcdedit.exe /set '{current}' $Op.key $Op.value 2>&1
-                if ($LASTEXITCODE -ne 0) { throw "bcdedit failed: $out" }
+            if ($null -eq $Op.value) {
+                # deleting a value that is not set is fine
+                if ($null -ne (Get-TRBcdValues)[$Op.key.ToLowerInvariant()]) { $r = Invoke-TRBcd @('/deletevalue', '{current}', $Op.key); if ($r.code -ne 0) { throw "bcdedit failed: $($r.out)" } }
+            } else {
+                $r = Invoke-TRBcd @('/set', '{current}', $Op.key, [string]$Op.value)
+                if ($r.code -ne 0) { throw "bcdedit failed: $($r.out)" }
             }
             return $backup
         }
@@ -235,8 +246,8 @@ function Invoke-TROpRevert {
         'bcd' {
             $b = $Backup
             if ($null -eq $b) { $b = @{ exists = $false } }
-            if ($b.exists) { $null = & bcdedit.exe /set '{current}' $Op.key $b.value 2>&1 }
-            else { $null = & bcdedit.exe /deletevalue '{current}' $Op.key 2>&1 }
+            if ($b.exists) { $null = Invoke-TRBcd @('/set', '{current}', $Op.key, [string]$b.value) }
+            else { $null = Invoke-TRBcd @('/deletevalue', '{current}', $Op.key) }
         }
         'ps' {
             if ($Op.revert) { $null = & (New-TRScript $Op.revert) $Ctx $Backup $Op }

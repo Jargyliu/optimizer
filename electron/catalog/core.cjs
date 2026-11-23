@@ -255,13 +255,19 @@ module.exports = [
       'Desktop gaming PCs rarely need hibernation. Turning it off removes hiberfil.sys, which is sized to a large fraction of your RAM (often 12-25 GB on a 32-64 GB system), and implies Fast Startup off. Sleep is unaffected.',
     impact: 'low', risk: 'safe', evidence: 'minor', reboot: 'none',
     presets: ['competitive', 'extreme'],
+    // GetPwrCapabilities: byte 6 of SYSTEM_POWER_CAPABILITIES is SystemS4 (hibernate supported by the hardware)
+    guard: `if (-not ('Tickrate.TRPower' -as [type])) { Add-Type -Name TRPower -Namespace Tickrate -MemberDefinition '[DllImport("powrprof.dll")] public static extern bool GetPwrCapabilities(byte[] caps);' }
+$caps = New-Object byte[] 256
+[Tickrate.TRPower]::GetPwrCapabilities($caps) -and $caps[6] -ne 0`,
+    guardMessage: 'This PC does not support hibernation.',
     ops: [
       ps({
         apply: `
 $cur = Read-TRRegValue 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power' 'HibernateEnabled'
-& powercfg.exe /hibernate off | Out-Null
+$ErrorActionPreference = 'Continue'
+& powercfg.exe /hibernate off 2>&1 | Out-Null
 @{ wasEnabled = (-not $cur.exists -or [int64]$cur.value -ne 0) }`,
-        revert: `if ($null -eq $Backup -or $Backup.wasEnabled) { & powercfg.exe /hibernate on | Out-Null }`,
+        revert: `$ErrorActionPreference = 'Continue'; if ($null -eq $Backup -or $Backup.wasEnabled) { & powercfg.exe /hibernate on 2>&1 | Out-Null }`,
         detect: `$v = Read-TRRegValue 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power' 'HibernateEnabled'; $v.exists -and [int64]$v.value -eq 0`,
       }),
     ],
