@@ -111,7 +111,7 @@ docs/TWEAKS.md       generated reference for every tweak: npm run docs
 
 ## Releases
 
-Push a version tag (`npm version patch && git push --follow-tags`) and `.github/workflows/release.yml` builds the NSIS installer and portable exe and attaches them to a draft GitHub Release.
+Push a version tag (`npm version patch && git push --follow-tags`) and `.github/workflows/release.yml` builds the NSIS installer and portable exe and attaches them to a GitHub Release.
 
 ## Credits
 
