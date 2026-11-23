@@ -1,16 +1,46 @@
 name: Release
 
-# Publishes installers to a GitHub Release when a version tag is pushed, e.g.:
-#   npm version patch && git push --follow-tags
+# Publishes a GitHub Release (installer + portable exe) whenever the version in
+# package.json changes on main and no release exists for it yet. GitHub creates the
+# v<version> tag automatically. Release notes come from docs/release-notes/v<version>.md.
+# Pushing a v* tag or running the workflow manually also works.
 on:
   push:
+    branches: [main]
+    paths: [package.json, .github/workflows/release.yml, 'docs/release-notes/**']
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      exists: ${{ steps.v.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"; echo "Release v$version already exists, nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"; echo "Will release v$version."
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.exists == 'false'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,3 +55,12 @@ jobs:
         run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ needs.check.outputs.version }}"
+          notes="docs/release-notes/$tag.md"
+          if [ -f "$notes" ]; then gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Tickrate $tag" --notes-file "$notes"; fi
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
