@@ -33,7 +33,9 @@ jobs:
           version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"; echo "Release v$version already exists, nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"; echo "Release v$version already exists; syncing its notes only."
+            notes="docs/release-notes/v$version.md"
+            if [ -f "$notes" ]; then gh release edit "v$version" --repo "$GITHUB_REPOSITORY" --title "Tickrate v$version" --notes-file "$notes"; fi
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"; echo "Will release v$version."
           fi
@@ -51,16 +53,18 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build:renderer
-      - name: Build and publish installers
-        run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Release notes
+      # Build first, then create the release in one call. (Letting electron-builder publish
+      # makes its parallel targets race to create the same release.)
+      - name: Build installers
+        run: npx electron-builder --win --publish never
+      - name: Publish release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="v${{ needs.check.outputs.version }}"
           notes="docs/release-notes/$tag.md"
-          if [ -f "$notes" ]; then gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Tickrate $tag" --notes-file "$notes"; fi
+          args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Tickrate $tag")
+          if [ -f "$notes" ]; then args+=(--notes-file "$notes"); else args+=(--generate-notes); fi
+          gh release create "$tag" release/Tickrate-*.exe "${args[@]}"
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
