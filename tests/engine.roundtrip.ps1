@@ -87,7 +87,7 @@ foreach ($t in $cat.tweaks) {
         $r = $ap.($t.id)
         if (-not $r.ok) { Fail "$($t.id) apply: $($r.errors -join '; ')"; continue }
         $mid = (Invoke-Engine 'tweaks.detect' @{ tweaks = @($t); ctx = $ctx }).($t.id).status
-        if (@('applied', 'na') -notcontains $mid) { Fail "$($t.id): status after apply is '$mid'" }
+        if ($mid -ne 'applied') { Fail "$($t.id): status after apply is '$mid' (expected 'applied')" }
         $rv = (Invoke-Engine 'tweaks.revert' @{ tweaks = @($t); ctx = $ctx }).($t.id)
         if (-not $rv.ok) { Fail "$($t.id) revert: $($rv.errors -join '; ')"; continue }
         $after = Get-Snapshot $t
