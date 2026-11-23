@@ -145,6 +145,14 @@ function createWindow() {
     },
   });
   win.once('ready-to-show', () => win.show());
+  // Renderer errors and crashes go to the log file so problems can be diagnosed after the fact.
+  win.webContents.on('console-message', (event, level, message) => {
+    const lvl = typeof event === 'object' && event && 'level' in event ? event.level : level;
+    const msg = typeof event === 'object' && event && 'message' in event ? event.message : message;
+    if (lvl === 3 || lvl === 'error') log({ action: 'ui', level: 'error', message: String(msg) });
+  });
+  win.webContents.on('render-process-gone', (_e, details) => log({ action: 'ui', level: 'error', message: `Renderer process gone: ${details.reason} (exit ${details.exitCode})` }));
+  win.webContents.on('did-fail-load', (_e, code, desc) => log({ action: 'ui', level: 'error', message: `Failed to load UI: ${desc} (${code})` }));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:')) shell.openExternal(url);
     return { action: 'deny' };

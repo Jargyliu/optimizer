@@ -65,12 +65,25 @@ export function createMockBridge(): TickrateBridge {
       : { status: 'default', tracked: false, appliedAt: null, errors: [] };
   };
 
+  // ?psjson reproduces Windows PowerShell's JSON quirk (one-item lists become bare objects),
+  // so the UI can be tested against real-engine-shaped data.
+  const psjson = typeof location !== 'undefined' && location.search.includes('psjson');
+  const one = <T,>(a: T[]): any => (psjson && a.length ? a[0] : a);
+
   async function handle(action: string, payload: any): Promise<any> {
     switch (action) {
       case 'ping': return { admin: true, psVersion: '5.1.26100', dataRoot: 'C:\\ProgramData\\Tickrate' };
       case 'scan':
         emit('Reading CPU, GPU, memory and display information', 'scan');
         await wait(1400);
+        if (psjson) {
+          return {
+            ...scan, scannedAt: new Date().toISOString(), appliedTweaks: one([...applied].slice(0, 1)),
+            gpus: one(scan.gpus.slice(0, 1)), gpuMsi: one(scan.gpuMsi), displays: one(scan.displays.slice(0, 1)),
+            storage: { ...scan.storage, disks: one(scan.storage.disks!.slice(0, 1)) },
+            software: { ...scan.software, backgroundApps: one(scan.software.backgroundApps!.slice(0, 1)) },
+          };
+        }
         return { ...scan, scannedAt: new Date().toISOString(), appliedTweaks: [...applied] };
       case 'games.detect': return scan.games;
       case 'tweaks.detect': {
@@ -111,14 +124,14 @@ export function createMockBridge(): TickrateBridge {
         for (const id of payload.ids) { emit(`Cleaning ${id}`, action); await wait(250); out[id] = { freed: Math.round(Math.random() * 9e8), skipped: Math.round(Math.random() * 4) }; }
         return out;
       }
-      case 'restore.status': return { enabled: true, points: restorePoints };
+      case 'restore.status': return { enabled: true, points: one(restorePoints.slice(0, psjson ? 1 : restorePoints.length)) };
       case 'restore.create':
         emit(`Creating restore point '${payload.description}'`, action);
         await wait(1500);
         restorePoints.push({ seq: restorePoints.length + 41, description: payload.description, created: new Date().toISOString(), type: 12 });
         return { enabled: true, points: restorePoints };
       case 'restore.open': return {};
-      case 'startup.list': return startup;
+      case 'startup.list': return one(startup.slice(0, psjson ? 1 : startup.length));
       case 'startup.set': { const s = startup.find((x) => x.id === payload.id); if (s) s.enabled = payload.enabled; return startup; }
       case 'apps.list': {
         const installed: Record<string, any> = {};
@@ -132,6 +145,7 @@ export function createMockBridge(): TickrateBridge {
         for (const l of ['Beginning system scan.  This process will take some time.', 'Beginning verification phase of system scan.', 'Verification 100% complete.', 'Windows Resource Protection did not find any integrity violations.']) { emit(l, action); await wait(500); }
         return { exitCode: 0 };
       case 'power.list':
+        if (psjson) return { guid: '381b4222-f694-41f0-9685-ff5bb260df2e', name: 'Balanced', active: true };
         return [
           { guid: '381b4222-f694-41f0-9685-ff5bb260df2e', name: 'Balanced', active: false },
           { guid: '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c', name: 'High performance', active: true },

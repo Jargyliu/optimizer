@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Lock, Package, RocketLaunch } from '@phosphor-icons/react';
 import { useStore } from '../lib/store';
 import type { StartupItem } from '../lib/types';
+import { asArray } from '../lib/format';
 import { Button, Checkbox, Chip, Empty, PageHeader, Panel, Skeleton, Toggle, cx, spring } from '../components/ui';
 import { Dialog, useDialog } from '../components/Shell';
 
@@ -52,6 +53,7 @@ function Apps() {
     confirm.close();
     try {
       const r = await call<{ removed: string[]; failed: string[] }>('apps.remove', { patterns: [...sel], deprovision }, `Removing ${sel.size} apps`);
+      r.removed = asArray(r.removed); r.failed = asArray(r.failed);
       toast(r.failed.length ? { kind: 'error', title: `${r.removed.length} removed, ${r.failed.length} failed`, detail: r.failed.join('\n') } : { kind: 'success', title: `${r.removed.length} apps removed` });
       await Promise.all([load(), refreshEngineState()]);
     } catch (e: any) { toast({ kind: 'error', title: 'Removal failed', detail: e.message }); }
@@ -111,11 +113,11 @@ function Startup() {
   const { call, toast } = useStore();
   const [items, setItems] = useState<StartupItem[] | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  useEffect(() => { call<StartupItem[]>('startup.list').then(setItems).catch((e) => toast({ kind: 'error', title: 'Could not list startup apps', detail: e.message })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { call<StartupItem[]>('startup.list').then((r) => setItems(asArray(r))).catch((e) => toast({ kind: 'error', title: 'Could not list startup apps', detail: e.message })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = async (it: StartupItem, enabled: boolean) => {
     setPending(it.id);
-    try { setItems(await call<StartupItem[]>('startup.set', { id: it.id, enabled })); }
+    try { setItems(asArray(await call<StartupItem[]>('startup.set', { id: it.id, enabled }))); }
     catch (e: any) { toast({ kind: 'error', title: `Could not change ${it.name}`, detail: e.message }); }
     finally { setPending(null); }
   };

@@ -82,7 +82,7 @@ export function computeFindings(f: ScanFacts): Finding[] {
   if (st.disks?.some((d) => d.media === 'HDD')) add({ id: 'hdd', severity: 'info', area: 'storage', title: 'A hard drive is installed', detail: 'Keep Fortnite and VALORANT on an NVMe SSD. Texture streaming from an HDD causes pop-in and hitches.' });
   const sw = f.software || {};
   if ((sw.startupCount ?? 0) > 8) add({ id: 'startup', severity: 'warn', area: 'software', title: `${sw.startupCount} apps start with Windows`, detail: 'Every launcher and tray app competes for CPU and RAM. Disable what you do not need at boot.', fix: { label: 'Startup apps', page: 'debloat' } });
-  if (sw.backgroundApps?.length) add({ id: 'bgapps', severity: 'info', area: 'software', title: `${sw.backgroundApps.length} known background apps running`, detail: `${sw.backgroundApps.join(', ')}. Close RGB and vendor control suites while playing. Several of them poll hardware and cause DPC spikes.` });
+  if (sw.backgroundApps?.length) add({ id: 'bgapps', severity: 'info', area: 'software', title: `${sw.backgroundApps.length} known background app${sw.backgroundApps.length === 1 ? '' : 's'} running`, detail: `${sw.backgroundApps.join(', ')}. Close RGB and vendor control suites while playing. Several of them poll hardware and cause DPC spikes.` });
   const g = f.games || {};
   if (!g.fortnite?.installed && !g.valorant?.installed) add({ id: 'games', severity: 'info', area: 'software', title: 'Fortnite / VALORANT not found', detail: 'Per-game tweaks (GPU preference, scanning exclusions, compatibility flags) need the game installed in a standard location.' });
 

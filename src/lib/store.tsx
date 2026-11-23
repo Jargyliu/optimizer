@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createMockBridge } from './mock';
 import { computeFindings, computeScore } from './findings';
+import { asArray } from './format';
 import type { Catalog, EngineState, Finding, LogLine, PageId, ScanFacts, Settings, TickrateBridge, TweakStatus } from './types';
 
 const bridge: TickrateBridge = window.tickrate ?? createMockBridge();
@@ -41,6 +42,26 @@ interface Store {
 }
 
 const Ctx = createContext<Store | null>(null);
+
+function normalizeScan(raw: any): ScanFacts {
+  const s = raw || {};
+  return {
+    ...s,
+    os: s.os || {}, cpu: s.cpu || { class: 'other' }, memory: s.memory || {}, security: s.security || {}, settings: s.settings || {}, games: s.games || {},
+    gpus: asArray(s.gpus), gpuMsi: asArray(s.gpuMsi), displays: asArray(s.displays), appliedTweaks: asArray(s.appliedTweaks),
+    storage: { ...(s.storage || {}), disks: asArray(s.storage?.disks) },
+    software: { ...(s.software || {}), backgroundApps: asArray(s.software?.backgroundApps) },
+  };
+}
+
+function normalizeState(raw: any): EngineState {
+  const s = raw || {};
+  return {
+    tweaks: s.tweaks && typeof s.tweaks === 'object' && !Array.isArray(s.tweaks) ? s.tweaks : {},
+    apps: asArray(s.apps),
+    nvidia: s.nvidia ? { ...s.nvidia, applied: asArray(s.nvidia.applied) } : null,
+  };
+}
 let seq = 1;
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -82,7 +103,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshStatuses = useCallback(async () => {
     setDetecting(true);
     try {
-      setStatuses(await call<Record<string, TweakStatus>>('tweaks.detect', {}));
+      const raw = await call<Record<string, TweakStatus>>('tweaks.detect', {});
+      const next: Record<string, TweakStatus> = {};
+      for (const [id, st] of Object.entries(raw || {})) next[id] = { ...st, errors: asArray(st?.errors) };
+      setStatuses(next);
     } catch (e: any) {
       toast({ kind: 'error', title: 'Could not read tweak status', detail: e.message });
     } finally {
@@ -91,13 +115,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [call, toast]);
 
   const refreshEngineState = useCallback(async () => {
-    try { setEngineState(await call<EngineState>('state.get')); } catch { /* shown elsewhere */ }
+    try { setEngineState(normalizeState(await call<EngineState>('state.get'))); } catch { /* shown elsewhere */ }
   }, [call]);
 
   const runScan = useCallback(async () => {
     setScanning(true);
     try {
-      setScan(await call<ScanFacts>('scan', {}, 'Scanning your PC'));
+      setScan(normalizeScan(await call<ScanFacts>('scan', {}, 'Scanning your PC')));
     } catch (e: any) {
       toast({ kind: 'error', title: 'Scan failed', detail: e.message });
     } finally {
@@ -120,7 +144,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const okCount = ids.length - failed.length;
       if (okCount) noteReboot(ids.filter((id) => res[id]?.ok));
       if (failed.length) {
-        toast({ kind: 'error', title: `${failed.length} of ${ids.length} could not be ${mode === 'apply' ? 'applied' : 'reverted'}`, detail: failed.map(([id, r]) => `${catalogRef.current?.tweaks.find((t) => t.id === id)?.title}: ${r.errors[0]}`).join('\n') });
+        toast({ kind: 'error', title: `${failed.length} of ${ids.length} could not be ${mode === 'apply' ? 'applied' : 'reverted'}`, detail: failed.map(([id, r]) => `${catalogRef.current?.tweaks.find((t) => t.id === id)?.title}: ${asArray(r.errors)[0] ?? 'unknown error'}`).join('\n') });
       } else {
         toast({ kind: 'success', title: `${okCount} tweak${okCount > 1 ? 's' : ''} ${mode === 'apply' ? 'applied' : 'reverted'}`, detail: mode === 'apply' ? 'Original values were backed up and can be restored any time.' : 'Original values restored.' });
       }

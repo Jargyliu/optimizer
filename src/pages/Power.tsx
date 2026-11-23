@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Lightning, CheckCircle } from '@phosphor-icons/react';
 import { useStore } from '../lib/store';
 import type { PowerPlan } from '../lib/types';
+import { asArray } from '../lib/format';
 import { Button, Chip, PageHeader, Panel, Skeleton, TweakStatePill, cx } from '../components/ui';
 
 export function Power() {
@@ -13,7 +14,7 @@ export function Power() {
   const st = statuses[tweakId]?.status;
   const busy = tasks.length > 0;
 
-  const load = async () => { try { setPlans(await call<PowerPlan[]>('power.list')); } catch (e: any) { toast({ kind: 'error', title: 'Could not list power plans', detail: e.message }); } };
+  const load = async () => { try { setPlans(asArray(await call<PowerPlan[]>('power.list'))); } catch (e: any) { toast({ kind: 'error', title: 'Could not list power plans', detail: e.message }); } };
   useEffect(() => { load(); }, [st]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activate = async (p: PowerPlan) => {

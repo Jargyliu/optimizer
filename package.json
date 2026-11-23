@@ -1,7 +1,7 @@
 {
   "name": "tickrate",
   "productName": "Tickrate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Low-latency Windows optimizer for Fortnite and Valorant, tuned for NVIDIA GPUs and AMD Ryzen X3D CPUs.",
   "license": "MIT",
   "private": true,

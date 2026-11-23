@@ -57,6 +57,9 @@ $games = @{ fortnite = @{ installed = $false }; valorant = @{ installed = $false
 Write-Host "`n== read-only actions" -ForegroundColor Cyan
 $ping = Invoke-Engine 'ping' @{}
 if ($ping.admin) { Pass 'ping (admin)' } else { Fail 'ping: not running as administrator' }
+foreach ($a in 'startup.list', 'power.list') {
+    try { $d = Invoke-Engine $a @{}; if ($d -isnot [array]) { Fail "$a did not return a JSON array" } } catch { }
+}
 foreach ($a in 'scan', 'games.detect', 'cleanup.analyze', 'restore.status', 'startup.list', 'power.list', 'nvidia.status', 'state.get') {
     try { $null = Invoke-Engine $a @{}; Pass $a } catch { Fail "$a -> $($_.Exception.Message)" }
 }
@@ -64,6 +67,10 @@ try { $null = Invoke-Engine 'apps.list' @{ patterns = @($cat.apps | ForEach-Obje
 try {
     $scan = Invoke-Engine 'scan' @{}
     if (-not $scan.cpu.name) { Fail 'scan returned no CPU name' } else { Pass "scan cpu: $($scan.cpu.name) [$($scan.cpu.class)]" }
+    # The UI relies on these being JSON arrays even when there is only one GPU / display / disk.
+    foreach ($field in 'gpus', 'gpuMsi', 'displays') { if ($scan.$field -isnot [array]) { Fail "scan.$field is not a JSON array" } else { Pass "scan.$field is an array ($(@($scan.$field).Count))" } }
+    if ($scan.storage.disks -isnot [array]) { Fail 'scan.storage.disks is not a JSON array' }
+    if ($scan.software.backgroundApps -isnot [array]) { Fail 'scan.software.backgroundApps is not a JSON array' }
 } catch { Fail "scan -> $($_.Exception.Message)" }
 
 Write-Host "`n== detect all tweaks" -ForegroundColor Cyan

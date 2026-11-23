@@ -114,7 +114,9 @@ $result = $null
 try {
     $raw = [IO.File]::ReadAllText($Request)
     $req = ConvertTo-TRHashtable ($raw | ConvertFrom-Json)
-    $data = Invoke-TRRequest $req
+    # Actions that return a list must stay a JSON array even with 0 or 1 items.
+    $listActions = @('startup.list', 'startup.set', 'power.list', 'power.activate')
+    if ($listActions -contains $req.action) { $data = @(Invoke-TRRequest $req) } else { $data = Invoke-TRRequest $req }
     $result = @{ ok = $true; data = $data }
 } catch {
     $msg = $_.Exception.Message

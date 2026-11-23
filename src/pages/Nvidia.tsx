@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowCounterClockwise, ArrowSquareOut, DownloadSimple, Eye, GraphicsCard } from '@phosphor-icons/react';
 import { useStore } from '../lib/store';
-import { formatDate } from '../lib/format';
+import { asArray, formatDate } from '../lib/format';
 import type { NvidiaSetting } from '../lib/types';
 import { Button, Chip, Empty, PageHeader, Panel, Skeleton, StatusDot, cx, spring } from '../components/ui';
 import { Dialog, useDialog } from '../components/Shell';
@@ -31,7 +31,7 @@ export function Nvidia() {
     const v: Record<string, number> = {};
     for (const d of defs) v[d.key] = d.recommended;
     v.vsync = settings.monitorType === 'vrr' ? VSYNC.on : settings.monitorType === 'fixed' ? VSYNC.off : VSYNC.app;
-    for (const a of status?.applied?.applied || []) {
+    for (const a of asArray<any>(status?.applied?.applied)) {
       const d = defs.find((x) => x.id === a.id);
       if (d) v[d.key] = Number(a.value);
     }
@@ -55,6 +55,7 @@ export function Nvidia() {
     const payload = defs.map((d) => ({ key: d.key, value: values[d.key] }));
     const r = await call<{ verified: boolean; mismatch: string[]; current: Record<string, string> }>('nvidia.apply', { settings: payload }, 'Writing NVIDIA driver profile');
     setCurrent(r.current);
+    r.mismatch = asArray(r.mismatch);
     if (r.verified) toast({ kind: 'success', title: 'Driver profile updated', detail: 'Read back from the driver and verified. Your original profile is backed up.' });
     else toast({ kind: 'error', title: 'Some settings did not stick', detail: r.mismatch.join(', ') });
     await Promise.all([load(), refreshEngineState()]);

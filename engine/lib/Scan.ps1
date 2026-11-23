@@ -177,15 +177,16 @@ function Get-TRScan {
                if ($v.exists) { $v.value } else { $null }) }
     } @{ class = 'other' }
 
-    $facts.gpus = Invoke-TRSafe {
+    # @() keeps one-item lists as JSON arrays (PowerShell unrolls single-element arrays)
+    $facts.gpus = @(Invoke-TRSafe {
         $list = @()
         foreach ($g in Get-CimInstance Win32_VideoController) {
             $list += @{ name = $g.Name; driver = $g.DriverVersion; driverDate = $(if ($g.DriverDate) { $g.DriverDate.ToString('yyyy-MM-dd') } else { $null }); vendor = $(if ($g.Name -match 'NVIDIA') { 'nvidia' } elseif ($g.Name -match 'AMD|Radeon') { 'amd' } elseif ($g.Name -match 'Intel') { 'intel' } else { 'other' }) }
         }
         ,$list
-    } @()
+    } @())
     $facts.nvidia = Invoke-TRSafe { Get-TRNvidiaSmi }
-    $facts.gpuMsi = Invoke-TRSafe { Get-TRGpuMsi } @()
+    $facts.gpuMsi = @(Invoke-TRSafe { Get-TRGpuMsi } @())
 
     $facts.memory = Invoke-TRSafe {
         $mods = @(Get-CimInstance Win32_PhysicalMemory)
@@ -198,7 +199,7 @@ function Get-TRScan {
            configuredMTs = ($mods | Measure-Object -Property ConfiguredClockSpeed -Minimum).Minimum }
     } @{}
 
-    $facts.displays = Invoke-TRSafe { Get-TRDisplays } @()
+    $facts.displays = @(Invoke-TRSafe { Get-TRDisplays } @())
 
     $facts.storage = Invoke-TRSafe {
         $sys = Get-PSDrive -Name ($env:SystemDrive.TrimEnd(':'))
@@ -206,7 +207,7 @@ function Get-TRScan {
         foreach ($d in Get-PhysicalDisk -ErrorAction SilentlyContinue) {
             $disks += @{ name = $d.FriendlyName; media = [string]$d.MediaType; bus = [string]$d.BusType; sizeGB = [math]::Round($d.Size / 1GB) }
         }
-        @{ systemFreeGB = [math]::Round($sys.Free / 1GB, 1); systemTotalGB = [math]::Round(($sys.Free + $sys.Used) / 1GB); disks = $disks }
+        @{ systemFreeGB = [math]::Round($sys.Free / 1GB, 1); systemTotalGB = [math]::Round(($sys.Free + $sys.Used) / 1GB); disks = @($disks) }
     } @{}
 
     $facts.security = Invoke-TRSafe {
@@ -253,7 +254,7 @@ function Get-TRScan {
         foreach ($k in $script:KnownBackgroundApps) {
             if (($names -contains $k.proc) -and ($bg -notcontains $k.label)) { $bg += $k.label }
         }
-        @{ processCount = $procs.Count; startupCount = (Get-TRStartupCount); backgroundApps = $bg }
+        @{ processCount = $procs.Count; startupCount = (Get-TRStartupCount); backgroundApps = @($bg) }
     } @{}
 
     $facts.games = Invoke-TRSafe { Get-TRGames } @{}

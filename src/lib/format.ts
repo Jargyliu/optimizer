@@ -19,3 +19,9 @@ export function timeAgo(iso: string | null | undefined) {
 export function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/** PowerShell's JSON output turns one-item lists into a bare object and empty lists into null. */
+export function asArray<T>(v: T[] | T | null | undefined): T[] {
+  if (Array.isArray(v)) return v;
+  return v === null || v === undefined ? [] : [v];
+}

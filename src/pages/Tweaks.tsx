@@ -209,7 +209,7 @@ function TweakRow({ t, selected, onSelect, onToggle, busy, detecting, cpuClass }
                 <p className="max-w-[65ch] text-[13px] leading-relaxed text-fg/85">{t.description}</p>
                 {t.warning && <p className="mt-3 flex gap-2 text-[12.5px] text-warn"><Warning size={15} className="mt-0.5 shrink-0" />{t.warning}</p>}
                 {state === 'na' && <p className="mt-3 text-[12.5px] text-fg-faint">{!applicable ? `Not used on your CPU. It is meant for ${t.cpu!.map((c) => CPU_LABEL[c]).join(' / ')}.` : t.guardMessage || 'Not applicable to this PC.'}</p>}
-                {st?.errors?.length ? <p className="mt-3 text-[12px] text-bad">{st.errors.join(' · ')}</p> : null}
+                {st?.errors?.length ? <p className="mt-3 text-[12px] text-bad">{[...st.errors].join(' · ')}</p> : null}
               </div>
               <div>
                 <p className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-fg-faint">What changes</p>

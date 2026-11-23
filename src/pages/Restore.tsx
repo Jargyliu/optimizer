@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowCounterClockwise, ClockCounterClockwise, FolderOpen, ShieldCheck } from '@phosphor-icons/react';
 import { useStore } from '../lib/store';
-import { formatDate, timeAgo } from '../lib/format';
+import { asArray, formatDate, timeAgo } from '../lib/format';
 import type { RestoreStatus } from '../lib/types';
 import { Button, Empty, PageHeader, Panel, Skeleton, StatusDot, Toggle } from '../components/ui';
 import { Dialog, useDialog } from '../components/Shell';
@@ -14,13 +14,14 @@ export function Restore() {
   const revertAll = useDialog();
   const busy = tasks.length > 0;
 
-  const load = async () => { try { setRs(await call<RestoreStatus>('restore.status')); } catch (e: any) { toast({ kind: 'error', title: 'Could not read restore points', detail: e.message }); } };
+  const load = async () => { try { const r = await call<RestoreStatus>('restore.status'); setRs({ ...r, points: asArray(r.points) }); } catch (e: any) { toast({ kind: 'error', title: 'Could not read restore points', detail: e.message }); } };
   useEffect(() => { load(); refreshEngineState(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async () => {
     setCreating(true);
     try {
-      setRs(await call<RestoreStatus>('restore.create', { description: desc.trim() || 'Tickrate restore point', enableIfOff: true }, 'Creating restore point'));
+      const r = await call<RestoreStatus>('restore.create', { description: desc.trim() || 'Tickrate restore point', enableIfOff: true }, 'Creating restore point');
+      setRs({ ...r, points: asArray(r.points) });
       toast({ kind: 'success', title: 'Restore point created' });
     } catch (e: any) { toast({ kind: 'error', title: 'Restore point failed', detail: e.message }); }
     finally { setCreating(false); }
